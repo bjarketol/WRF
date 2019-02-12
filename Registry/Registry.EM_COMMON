@@ -179,19 +179,19 @@ state    real   erod           ij.      misc        1        -     i012rd  "EROD
 # --------------------------------------------------------------------------------------
 # new tendency variables for dynamical analysis - (NM 2013)
 # --------------------------------------------------------------------------------------
-state   real    ru_tend_adv     ikj     dyn_em          1               X               irh "RU_TEND_ADV"       "u-advection tendency" ""
-state   real    ru_tend_pgf     ikj     dyn_em          1               X               irh "RU_TEND_PGF"       "u-pressure gradient tendency" ""
-state   real    ru_tend_cor     ikj     dyn_em          1               X               irh "RU_TEND_COR"       "u-coriolis tendency" ""
-state   real    ru_tend_curv    ikj     dyn_em          1               X               irh "RU_TEND_CURV"      "u curvature gradient tendency" ""
-state   real    ru_tend_hdiff   ikj     dyn_em          1               X               irh "RU_TEND_HDIFF"     "u horizontal diffusion tendency" ""
-state   real    ru_tend_phys    ikj     dyn_em          1               X               irh "RU_TEND_PHYS"      "total u physics tendency" ""
-state   real    rv_tend_adv     ikj     dyn_em          1               Y               irh "RV_TEND_ADV"       "v-advection tendency" ""
-state   real    rv_tend_pgf     ikj     dyn_em          1               Y               irh "RV_TEND_PGF"       "v-pressure gradient tendency" ""
-state   real    rv_tend_cor     ikj     dyn_em          1               Y               irh "RV_TEND_COR"       "v-coriolis tendency" ""
-state   real    rv_tend_curv    ikj     dyn_em          1               Y               irh "RV_TEND_CURV"      "v curvature gradient tendency" ""
-state   real    rv_tend_hdiff   ikj     dyn_em          1               Y               irh "RV_TEND_HDIFF"     "v horizontal diffusion tendency" ""
-state   real    rv_tend_phys    ikj     dyn_em          1               Y               irh "RV_TEND_PHYS"      "total v physics tendency" ""
-state   real    t_tend_adv      ikj     dyn_em          1               -               irh "T_TEND_ADV"        "t-advection tendency" ""
+state   real    ru_tend_adv     ikj     dyn_em          1               X               irh "U_TEND_ADV"        "U-component of advection tendency" "m s-2"
+state   real    ru_tend_pgf     ikj     dyn_em          1               X               irh "U_TEND_PGF"        "U-component of pressure gradient tendency" "m s-2"
+state   real    ru_tend_cor     ikj     dyn_em          1               X               irh "U_TEND_COR"        "U-component of coriolis tendency" "m s-2"
+state   real    ru_tend_curv    ikj     dyn_em          1               X               irh "U_TEND_CURV"       "U-component of curvature gradient tendency" "m s-2"
+state   real    ru_tend_hdiff   ikj     dyn_em          1               X               irh "U_TEND_HDIFF"      "U-component of horizontal diffusion tendency" "m s-2"
+state   real    ru_tend_phys    ikj     dyn_em          1               X               irh "U_TEND_PHYS"       "U-component of physics tendency" "m s-2"
+state   real    rv_tend_adv     ikj     dyn_em          1               Y               irh "V_TEND_ADV"        "V-component of advection tendency" "m s-2"
+state   real    rv_tend_pgf     ikj     dyn_em          1               Y               irh "V_TEND_PGF"        "V-component of pressure gradient tendency" "m s-2"
+state   real    rv_tend_cor     ikj     dyn_em          1               Y               irh "V_TEND_COR"        "V-component of coriolis tendency" "m s-2"
+state   real    rv_tend_curv    ikj     dyn_em          1               Y               irh "V_TEND_CURV"       "V-component of curvature gradient tendency" "m s-2"
+state   real    rv_tend_hdiff   ikj     dyn_em          1               Y               irh "V_TEND_HDIFF"      "V-component of horizontal diffusion tendency" "m s-2"
+state   real    rv_tend_phys    ikj     dyn_em          1               Y               irh "V_TEND_PHYS"       "V-component of physics tendency" "m s-2"
+state   real    t_tend_adv      ikj     dyn_em          1               -               irh "T_TEND_ADV"        "t-advection tendency" "K s-1"
 
 state   real   ts_w_profile     ?!k     misc            -               -               -   "TS_W_PROFILE"      "Wind w-Component, vertical profile"
 
