@@ -5,10 +5,10 @@
 MODULE module_em
 
    USE module_model_constants
-   
+
    USE module_advect_em, only: advect_u, advect_v, advect_w, advect_scalar, advect_scalar_pd, advect_scalar_mono, &
         advect_weno_u, advect_weno_v, advect_weno_w, advect_scalar_weno,  advect_scalar_wenopd
-   
+
    USE module_big_step_utilities_em, only: grid_config_rec_type, calculate_full, couple_momentum, calc_mu_uv, calc_ww_cp, &
         calc_cq, calc_alt, calc_php, set_tend, rhs_ph, &
     horizontal_pressure_gradient, pg_buoy_w, w_damp, perturbation_coriolis, coriolis, curvature, horizontal_diffusion, &
@@ -88,7 +88,7 @@ SUBROUTINE rk_step_prep  ( config_flags, rk_step,           &
 
    REAL , DIMENSION(  ims:ime , kms:kme, jms:jme ) ,                      &
                                                INTENT(IN   ) ::  p
-                                                                 
+
 
 
 
@@ -188,6 +188,11 @@ END SUBROUTINE rk_step_prep
 
 SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                          ru_tend, rv_tend, rw_tend, ph_tend, t_tend,      &
+                         ru_tend_cor, ru_tend_adv, ru_tend_pgf,           & ! Added for tendencies (JSR, BTOL)
+                         ru_tend_curv, ru_tend_hdiff,                     & ! Added for tendencies (JSR, BTOL)
+                         rv_tend_cor, rv_tend_adv, rv_tend_pgf,           & ! Added for tendencies (JSR, BTOL)
+                         rv_tend_curv, rv_tend_hdiff,                     & ! Added for tendencies (JSR, BTOL)
+                         t_tend_adv,                                      & ! Added for tendencies (JSR, BTOL)
                          ru_tendf, rv_tendf, rw_tendf, ph_tendf, t_tendf, &
                          mu_tend, u_save, v_save, w_save, ph_save,        &
                          t_save, mu_save, RTHFTEN,                        &
@@ -261,6 +266,17 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                                          rv_tend, &
                                                          rw_tend, &
                                                          t_tend,  &
+                                                         ru_tend_cor,   & ! Added for tendencies (JSR, BTOL)
+                                                         ru_tend_adv,   & ! Added for tendencies (JSR, BTOL)
+                                                         ru_tend_pgf,   & ! Added for tendencies (JSR, BTOL)
+                                                         ru_tend_curv,  & ! Added for tendencies (JSR, BTOL)
+                                                         ru_tend_hdiff, & ! Added for tendencies (JSR, BTOL)
+                                                         rv_tend_cor,   & ! Added for tendencies (JSR, BTOL)
+                                                         rv_tend_adv,   & ! Added for tendencies (JSR, BTOL)
+                                                         rv_tend_pgf,   & ! Added for tendencies (JSR, BTOL)
+                                                         rv_tend_curv,  & ! Added for tendencies (JSR, BTOL)
+                                                         rv_tend_hdiff, & ! Added for tendencies (JSR, BTOL)
+                                                         t_tend_adv,    & ! Added for tendencies (JSR, BTOL)
                                                          ph_tend, &
                                                          RTHFTEN, &
                                                           u_save, &
@@ -334,10 +350,13 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
    INTEGER :: i,j,k
    INTEGER :: time_step
 
+   REAL , DIMENSION( ims:ime , kms:kme, jms:jme  ) :: ru_tend_old, rv_tend_old, t_tend_old ! Added for tendencies (JSR, BTOL)
+
+
 !<DESCRIPTION>
 !
 !  rk_tendency computes the large-timestep tendency terms in the
-!  momentum, thermodynamic (theta), and geopotential equations.  
+!  momentum, thermodynamic (theta), and geopotential equations.
 !  These terms include:
 !
 !  (1) advection (for u, v, w, theta - calls to advect_u, advect_v,
@@ -431,7 +450,9 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                    its, ite, jts, jte, kts, kte )
 
      ELSE
-     
+
+     ru_tend_old = ru_tend  ! NM: added line - record current ru_tendency
+
      CALL advect_u ( u, u , ru_tend, ru, rv, ww, &
                    c1h, c2h,                     &
                    mut, time_step, config_flags, &
@@ -441,7 +462,15 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                    ids, ide, jds, jde, kds, kde, &
                    ims, ime, jms, jme, kms, kme, &
                    its, ite, jts, jte, kts, kte )
-      ENDIF
+
+     ru_tend_adv = ru_tend - ru_tend_old ! NM: added line for u_adv
+
+      ! PCorreia: added division by muu
+     do k=kms,kme
+       ru_tend_adv(:,k,:)= ru_tend_adv(:,k,:)/muu(:,:)
+     enddo
+
+     ENDIF
 
      IF( (rk_step == 3) .and. ( adv_opt == WENO_MOM ) ) THEN
 
@@ -456,7 +485,10 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                    its, ite, jts, jte, kts, kte )
 
     ELSE
-     
+
+
+     rv_tend_old = rv_tend                              !!NM: added line record current rv_tendency
+
      CALL advect_v ( v, v , rv_tend, ru, rv, ww,  &
                    c1h, c2h,                     &
                    mut, time_step, config_flags, &
@@ -466,6 +498,12 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                    ids, ide, jds, jde, kds, kde, &
                    ims, ime, jms, jme, kms, kme, &
                    its, ite, jts, jte, kts, kte )
+
+     rv_tend_adv = rv_tend - rv_tend_old             !!NM: added line for v_adv
+     do k=kms,kme
+       rv_tend_adv(:,k,:)= rv_tend_adv(:,k,:)/muv(:,:)
+     enddo
+
     ENDIF
 
 
@@ -482,7 +520,7 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                      its, ite, jts, jte, kts, kte )
 
      ELSE
-     
+
      CALL advect_w ( w, w, rw_tend, ru, rv, ww,    &
                      c1h, c2h,                     &
                      mut, time_step, config_flags, &
@@ -516,6 +554,8 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                  its, ite, jts, jte, kts, kte  )
      ELSE
 
+     t_tend_old = t_tend                            !!JSR: added line for current t_tendency
+
      CALL advect_scalar ( t, t, t_tend, ru, rv, ww,     &
                           c1h, c2h,                     &
                           mut, time_step, config_flags, &
@@ -526,8 +566,14 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                           ims, ime, jms, jme, kms, kme, &
                           its, ite, jts, jte, kts, kte )
 
+     t_tend_adv = t_tend - t_tend_old               !!JSR: added line for t_tend_adv
+     do k=kms,kme
+       t_tend_adv(:,k,:)= t_tend_adv(:,k,:)/mut(:,:)
+     enddo
+
+
      ENDIF
-     
+
      IF ( config_flags%cu_physics == GDSCHEME  .OR.     &
           config_flags%cu_physics == GFSCHEME  .OR.     &
           config_flags%cu_physics == G3SCHEME  .OR.     &
@@ -556,6 +602,9 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                   ims, ime, jms, jme, kms, kme,      &
                   its, ite, jts, jte, kts, kte      )
 
+     ru_tend_old = ru_tend                              !!NM: added line record current ru_tenden
+     rv_tend_old = rv_tend                              !!NM: added line record current rv_tenden
+
      CALL horizontal_pressure_gradient( ru_tend,rv_tend,                 &
                                          ph,alt,p,pb,al,php,cqu,cqv,     &
                                          muu,muv,mu,c1h,c2h,fnm,fnp,rdnw,&
@@ -567,6 +616,16 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                          ids, ide, jds, jde, kds, kde,   &
                                          ims, ime, jms, jme, kms, kme,   &
                                          its, ite, jts, jte, kts, kte   )
+
+     ru_tend_pgf = ru_tend - ru_tend_old               !added line ru pgf tendency
+     rv_tend_pgf = rv_tend - rv_tend_old
+       ! PCorreia: added division by muu and muv
+     do k=kms,kme
+       ru_tend_pgf(:,k,:)= ru_tend_pgf(:,k,:)/muu(:,:)
+       rv_tend_pgf(:,k,:)= rv_tend_pgf(:,k,:)/muv(:,:)
+     enddo
+
+
 
      IF (non_hydrostatic) THEN
           CALL pg_buoy_w( rw_tend, p, cqw, mu, mub,       &
@@ -600,6 +659,10 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                        ims, ime, jms, jme, kms, kme, &
                                        its, ite, jts, jte, kts, kte )
      ELSE
+
+          ru_tend_old = ru_tend                              !!NM: added line record current ru_tenden
+          rv_tend_old = rv_tend                              !!NM: added line record current rv_tenden
+
           CALL coriolis ( ru, rv, rw,                   &
                           ru_tend,  rv_tend,  rw_tend,  &
                           config_flags,                 &
@@ -610,7 +673,18 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                           ims, ime, jms, jme, kms, kme, &
                           its, ite, jts, jte, kts, kte )
 
+          ru_tend_cor = ru_tend - ru_tend_old               !added line ru for coriolis tendency
+          rv_tend_cor = rv_tend - rv_tend_old               !added line rv for coriolis tendency
+
+          do k=kms,kme
+            ru_tend_cor(:,k,:)= ru_tend_cor(:,k,:)/muu(:,:)
+            rv_tend_cor(:,k,:)= rv_tend_cor(:,k,:)/muv(:,:)
+          enddo
+
      END IF
+
+     ru_tend_old = ru_tend                              !!NM: added line record current ru_tenden
+     rv_tend_old = rv_tend                              !!NM: added line record current rv_tenden
 
      CALL curvature ( ru, rv, rw, u, v, w,            &
                        ru_tend,  rv_tend,  rw_tend,    &
@@ -622,9 +696,17 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                        ims, ime, jms, jme, kms, kme,   &
                        its, ite, jts, jte, kts, kte   )
 
+     ru_tend_curv = ru_tend - ru_tend_old               !added line ru for curvature tendency
+     rv_tend_curv = rv_tend - rv_tend_old               !added line rv for curvature tendency
+
+     do k=kms,kme
+       ru_tend_curv(:,k,:)= ru_tend_curv(:,k,:)/muu(:,:)
+       rv_tend_curv(:,k,:)= rv_tend_curv(:,k,:)/muv(:,:)
+     enddo
+
 ! Damping option added for Held-Suarez test (also uses lw option HELDSUAREZ)
       IF (config_flags%ra_lw_physics == HELDSUAREZ) THEN
-         CALL held_suarez_damp ( ru_tend, rv_tend,               &   
+         CALL held_suarez_damp ( ru_tend, rv_tend,               &
                                  ru,rv,p,pb,                     &
                                  ids, ide, jds, jde, kds, kde,   &
                                  ims, ime, jms, jme, kms, kme,   &
@@ -641,7 +723,9 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
   forward_step: IF( rk_step == 1 ) THEN
 
     diff_opt1 : IF (config_flags%diff_opt .eq. 1) THEN
-   
+
+        ru_tend_old = ru_tendf                          !!NM: added line record current ru_tenden
+
         CALL horizontal_diffusion ('u', u, ru_tendf, mut,               &
                                         c1h, c2h, config_flags,         &
                                         msfux, msfuy, msfvx, msfvx_inv, &
@@ -651,6 +735,10 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                         ims, ime, jms, jme, kms, kme,   &
                                         its, ite, jts, jte, kts, kte   )
 
+        ru_tend_hdiff = ru_tendf - ru_tend_old               !added line ru for diffusion tendency
+
+        rv_tend_old = rv_tendf                          !!NM: added line record current rv_tenden
+
         CALL horizontal_diffusion ('v', v, rv_tendf, mut,               &
                                         c1h, c2h, config_flags,         &
                                         msfux, msfuy, msfvx, msfvx_inv, &
@@ -659,6 +747,13 @@ SUBROUTINE rk_tendency ( config_flags, rk_step,                           &
                                         ids, ide, jds, jde, kds, kde,   &
                                         ims, ime, jms, jme, kms, kme,   &
                                         its, ite, jts, jte, kts, kte   )
+
+        rv_tend_hdiff = rv_tendf - rv_tend_old               !added line rv for hdiff tendency
+
+        do k=kms,kme
+          ru_tend_hdiff(:,k,:)= ru_tend_hdiff(:,k,:)/muu(:,:)
+          rv_tend_hdiff(:,k,:)= rv_tend_hdiff(:,k,:)/muv(:,:)
+        enddo
 
         CALL horizontal_diffusion ('w', w, rw_tendf, mut,               &
                                         c1f, c2f, config_flags,         &
@@ -799,6 +894,7 @@ END SUBROUTINE rk_tendency
 
 SUBROUTINE rk_addtend_dry ( ru_tend, rv_tend, rw_tend, ph_tend, t_tend,      &
                             ru_tendf, rv_tendf, rw_tendf, ph_tendf, t_tendf, &
+                            ru_tend_phys, rv_tend_phys,                      & !added line (NM)
                             u_save, v_save, w_save, ph_save, t_save,         &
                             mu_tend, mu_tendf, rk_step, c1, c2,              &
                             h_diabatic, mut, msftx, msfty, msfux, msfuy,     &
@@ -828,6 +924,9 @@ SUBROUTINE rk_addtend_dry ( ru_tend, rv_tend, rw_tend, ph_tend, t_tend,      &
                                                                       rw_tendf, &
                                                                       ph_tendf, &
                                                                       t_tendf
+
+   REAL , DIMENSION( ims:ime , kms:kme, jms:jme  ) , INTENT(OUT) :: ru_tend_phys, & ! added
+                                                                    rv_tend_phys
 
    REAL , DIMENSION( ims:ime , jms:jme  ) , INTENT(INOUT) :: mu_tend, &
                                                              mu_tendf
@@ -885,6 +984,9 @@ SUBROUTINE rk_addtend_dry ( ru_tend, rv_tend, rw_tend, ph_tend, t_tend,      &
    ENDDO
    ENDDO
    ENDDO
+
+   ru_tend_phys = ru_tendf              !added line for exporting dynamics (NM)
+   rv_tend_phys = rv_tendf              !added line for exporting dynamics (NM)
 
    DO j = jts,jte
    DO k = kts,kte-1
@@ -976,7 +1078,7 @@ SUBROUTINE rk_scalar_tend ( scs, sce, config_flags,          &
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme , scs:sce ),                      &
                                          INTENT(INOUT)  :: scalar_tends
-                                                    
+
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme  ), INTENT(INOUT) :: advect_tend
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme  ), INTENT(  OUT) :: h_tendency, z_tendency
 
@@ -1019,11 +1121,11 @@ SUBROUTINE rk_scalar_tend ( scs, sce, config_flags,          &
 
    REAL ,                                        INTENT(IN   ) :: dt
 
-   INTEGER, INTENT(IN   ) :: adv_opt          
+   INTEGER, INTENT(IN   ) :: adv_opt
    LOGICAL, INTENT(IN   ) :: mix2_off, mix6_off
 
    ! Local data
-  
+
    INTEGER :: im, i,j,k
    INTEGER :: time_step
 
@@ -1248,7 +1350,7 @@ SUBROUTINE q_diabatic_add ( scs, sce,                        &
    REAL ,                                        INTENT(IN   ) :: dt
 
    ! Local data
-  
+
    INTEGER :: im, i,j,k
 
 !<DESCRIPTION>
@@ -1315,7 +1417,7 @@ SUBROUTINE q_diabatic_subtr( scs, sce,                       &
    REAL ,                                        INTENT(IN   ) :: dt
 
    ! Local data
-  
+
    INTEGER :: im, i,j,k
 
 !<DESCRIPTION>
@@ -1420,7 +1522,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
 !<DESCRIPTION>
 !
 !  rk_scalar_update advances the scalar equation given the time t value
-!  of the scalar and the scalar tendency.  
+!  of the scalar and the scalar tendency.
 !
 !</DESCRIPTION>
 
@@ -1465,7 +1567,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
        ENDDO
        ENDDO
        ENDDO
-   
+
        DO  j = j_start,j_end
        DO  k = k_start,k_end
        DO  i = i_start,i_end
@@ -1474,7 +1576,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
        ENDDO
        ENDDO
        ENDDO
-   
+
        DO  j = j_start_spc,j_end_spc
        DO  k = k_start_spc,k_end_spc
        DO  i = i_start_spc,i_end_spc
@@ -1482,7 +1584,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
        ENDDO
        ENDDO
        ENDDO
-   
+
       DO  j = jts, min(jte,jde-1)
 
       DO  i = its, min(ite,ide-1)
@@ -1516,7 +1618,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
        ENDDO
        ENDDO
        ENDDO
-   
+
        DO  j = j_start,j_end
        DO  k = k_start,k_end
        DO  i = i_start,i_end
@@ -1525,7 +1627,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
        ENDDO
        ENDDO
        ENDDO
-   
+
        DO  j = j_start_spc,j_end_spc
        DO  k = k_start_spc,k_end_spc
        DO  i = i_start_spc,i_end_spc
@@ -1563,7 +1665,7 @@ SUBROUTINE rk_update_scalar( scs, sce,                      &
           ENDDO
         END IF
       END IF
-      
+
       ENDDO
 
       ENDDO
@@ -1619,7 +1721,7 @@ SUBROUTINE rk_update_scalar_pd( scs, sce,                      &
 !<DESCRIPTION>
 !
 !  rk_scalar_update advances the scalar equation given the time t value
-!  of the scalar and the scalar tendency.  
+!  of the scalar and the scalar tendency.
 !
 !</DESCRIPTION>
 
@@ -1659,7 +1761,7 @@ SUBROUTINE rk_update_scalar_pd( scs, sce,                      &
        ENDDO
        ENDDO
        ENDDO
-   
+
        DO  j = j_start_spc,j_end_spc
        DO  k = k_start_spc,k_end_spc
        DO  i = i_start_spc,i_end_spc
@@ -1883,13 +1985,13 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
 
       REAL,     DIMENSION( kms:kme )                                 , &
                 INTENT(IN   )   ::                               c1, c2
-                                                                 
+
       REAL,     DIMENSION( ims:ime, jms:jme )                        , &
                 INTENT(IN   )   ::                                mut, &
                                                                   muu, &
                                                                   muv
-      
-                                                           
+
+
 ! radiation
 
       REAL,     DIMENSION( ims:ime, kms:kme, jms:jme ),                &
@@ -2318,9 +2420,9 @@ subroutine trajectory (     grid,config_flags,               &
 
   implicit none
 !---------------------------------------------------------------------------------------------------
-! Subroutine trajectory calculates forward Lagrangian trajectory  
+! Subroutine trajectory calculates forward Lagrangian trajectory
 ! of the selecting points. The trajectory of each point is subjected to u, v, and w.
-! (Lee and Chen 2013, MWR).     
+! (Lee and Chen 2013, MWR).
 !
 ! The trajectories is initialized with given longitude (degree), latitude (degree), and height(eta level).
 !
@@ -2624,7 +2726,7 @@ enddo traj_loop
 END SUBROUTINE trajectory
 !------------------------------------------------------------------------
 !cyl:Implement the map prpjection code for trajectory calculation
-!                                    Chiaying Lee  RSMAS/UM        
+!                                    Chiaying Lee  RSMAS/UM
 !------------------------------------------------------------------------
 subroutine trajmapproj (grid,config_flags,ts_proj)
 !------------------------------------------------------------------------
